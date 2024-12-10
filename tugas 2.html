@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Navier-Stokes Wind Simulation</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: linear-gradient(to right, #00c6ff, #0072ff);
+            color: white;
+        }
+        header {
+            background-color: rgba(0, 123, 255, 0.8);
+            color: white;
+            width: 100%;
+            padding: 10px 0;
+            text-align: center;
+            font-size: 24px;
+        }
+        canvas {
+            border: 2px solid rgba(255, 255, 255, 0.8);
+            margin-top: 20px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+        footer {
+            margin-top: 20px;
+            color: white;
+            font-size: 14px;
+            text-align: center;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        .controls input {
+            padding: 10px;
+            font-size: 16px;
+            background-color: #0072ff;
+            border: none;
+            color: white;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        Navier-Stokes Wind Simulation
+    </header>
+    <canvas id="simulationCanvas" width="600" height="400"></canvas>
+    <div class="controls">
+        <label for="viscosity">Viscosity: </label>
+        <input type="range" id="viscosity" min="0" max="1" step="0.01" value="0.1">
+        <label for="timeStep">Time Step: </label>
+        <input type="range" id="timeStep" min="0.01" max="0.5" step="0.01" value="0.1">
+    </div>
+    <footer>
+        Created by Your Name - © 2024
+    </footer>
+
+    <script>
+        const canvas = document.getElementById('simulationCanvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        const gridSize = 20; // Size of the grid
+        const numCols = Math.floor(width / gridSize);
+        const numRows = Math.floor(height / gridSize);
+
+        let viscosity = parseFloat(document.getElementById('viscosity').value); // Viscosity coefficient
+        let timeStep = parseFloat(document.getElementById('timeStep').value); // Time step for Euler method
+
+        const u = Array.from({ length: numRows }, () => Array(numCols).fill(0));
+        const v = Array.from({ length: numRows }, () => Array(numCols).fill(0));
+
+        // Initialize velocity field with random values
+        for (let i = 0; i < numRows; i++) {
+            for (let j = 0; j < numCols; j++) {
+                u[i][j] = Math.random() * 2 - 1;
+                v[i][j] = Math.random() * 2 - 1;
+            }
+        }
+
+        // Update velocity field using Euler method
+        function updateVelocity() {
+            const newU = Array.from({ length: numRows }, () => Array(numCols).fill(0));
+            const newV = Array.from({ length: numRows }, () => Array(numCols).fill(0));
+
+            for (let i = 1; i < numRows - 1; i++) {
+                for (let j = 1; j < numCols - 1; j++) {
+                    const advectU = -u[i][j] * (u[i][j + 1] - u[i][j - 1]) / (2 * gridSize)
+                                     - v[i][j] * (u[i + 1][j] - u[i - 1][j]) / (2 * gridSize);
+                    const diffuseU = viscosity * (u[i][j + 1] + u[i][j - 1] + u[i + 1][j] + u[i - 1][j] - 4 * u[i][j]) / (gridSize * gridSize);
+
+                    const advectV = -u[i][j] * (v[i][j + 1] - v[i][j - 1]) / (2 * gridSize)
+                                     - v[i][j] * (v[i + 1][j] - v[i - 1][j]) / (2 * gridSize);
+                    const diffuseV = viscosity * (v[i][j + 1] + v[i][j - 1] + v[i + 1][j] + v[i - 1][j] - 4 * v[i][j]) / (gridSize * gridSize);
+
+                    newU[i][j] = u[i][j] + timeStep * (advectU + diffuseU);
+                    newV[i][j] = v[i][j] + timeStep * (advectV + diffuseV);
+                }
+            }
+
+            for (let i = 0; i < numRows; i++) {
+                for (let j = 0; j < numCols; j++) {
+                    u[i][j] = newU[i][j];
+                    v[i][j] = newV[i][j];
+                }
+            }
+        }
+
+        // Draw the velocity field with animation
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            for (let i = 0; i < numRows; i++) {
+                for (let j = 0; j < numCols; j++) {
+                    const x = j * gridSize;
+                    const y = i * gridSize;
+                    const length = Math.sqrt(u[i][j] ** 2 + v[i][j] ** 2);
+
+                    // Calculate direction and intensity
+                    const angle = Math.atan2(v[i][j], u[i][j]);
+                    const speed = Math.min(length, 1); // Normalize speed
+
+                    // Color based on speed (intensity)
+                    const color = `hsl(${(angle + Math.PI) * 180 / Math.PI}, 100%, ${speed * 50 + 25}%)`;
+
+                    ctx.beginPath();
+                    ctx.moveTo(x + gridSize / 2, y + gridSize / 2);
+                    ctx.lineTo(
+                        x + gridSize / 2 + (u[i][j] / length) * 10,
+                        y + gridSize / 2 + (v[i][j] / length) * 10
+                    );
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Main animation loop
+        function animate() {
+            updateVelocity();
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        // Interactivity: Update viscosity and time step when input changes
+        document.getElementById('viscosity').addEventListener('input', function() {
+            viscosity = parseFloat(this.value);
+        });
+
+        document.getElementById('timeStep').addEventListener('input', function() {
+            timeStep = parseFloat(this.value);
+        });
+
+        // Start simulation
+        animate();
+    </script>
+</body>
+</html>
